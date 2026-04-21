@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SearchCommand } from "./search-command";
 import { ThemeToggle } from "./theme-toggle";
 import { MobileNav } from "./mobile-nav";
 
@@ -29,15 +28,7 @@ export function Header() {
     <header className="flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6">
       <MobileNav />
 
-      <div className="hidden items-center gap-4 lg:flex">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold lg:hidden">
-          R
-        </div>
-      </div>
-
-      <div className="flex-1">
-        <SearchCommand />
-      </div>
+      <div className="flex-1" />
 
       <div className="flex items-center gap-2">
         <ThemeToggle />
