@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "users" ALTER COLUMN "orgId" DROP NOT NULL,
+ALTER COLUMN "googleId" DROP NOT NULL;
