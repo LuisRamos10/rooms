@@ -30,7 +30,7 @@ export interface Room {
 
 export function useRooms() {
   return useSWR<Room[]>("/api/rooms", fetcher, {
-    refreshInterval: 30000,
+    refreshInterval: 15000,
     revalidateOnFocus: true,
   });
 }

@@ -82,6 +82,14 @@ async function fetchSpaceInfo(auth: InstanceType<typeof google.auth.JWT>, spaceN
   }
 }
 
+async function fetchConferenceRecord(auth: InstanceType<typeof google.auth.JWT>, recordName: string): Promise<ConferenceRecord | null> {
+  try {
+    return await fetchWithAuth(auth, `${MEET_API_BASE}/${recordName}`);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchParticipantsForRecord(
   orgId: string,
   conferenceRecordName: string
@@ -155,6 +163,7 @@ export async function syncMeetParticipantsForOrg(orgId: string) {
     }
 
     let matched = 0;
+    const liveRoomIds = new Set<string>();
 
     for (const record of conferenceRecords) {
       const spaceInfo = await fetchSpaceInfo(auth, record.space);
@@ -167,6 +176,7 @@ export async function syncMeetParticipantsForOrg(orgId: string) {
       if (!matchingRoom) continue;
 
       matched++;
+      liveRoomIds.add(matchingRoom.id);
 
       await prisma.room.update({
         where: { id: matchingRoom.id },
@@ -180,7 +190,7 @@ export async function syncMeetParticipantsForOrg(orgId: string) {
 
       await prisma.roomParticipant.updateMany({
         where: { roomId: matchingRoom.id, isActive: true },
-        data: { isActive: false, leaveTime: new Date() },
+        data: { isActive: false, leaveTime: now },
       });
 
       for (const participant of participants) {
@@ -228,7 +238,29 @@ export async function syncMeetParticipantsForOrg(orgId: string) {
 
       await prisma.room.update({
         where: { id: matchingRoom.id },
-        data: { syncedAt: new Date() },
+        data: { syncedAt: now },
+      });
+    }
+
+    const roomsToCheck = todaysRooms.filter(
+      (r) => !liveRoomIds.has(r.id) && r.conferenceRecordId
+    );
+
+    for (const room of roomsToCheck) {
+      const record = await fetchConferenceRecord(auth, room.conferenceRecordId!);
+
+      if (record && !record.endTime) continue;
+
+      const leaveTime = record?.endTime ? new Date(record.endTime) : now;
+
+      await prisma.roomParticipant.updateMany({
+        where: { roomId: room.id, isActive: true },
+        data: { isActive: false, leaveTime },
+      });
+
+      await prisma.room.update({
+        where: { id: room.id },
+        data: { status: "ENDED", syncedAt: now },
       });
     }
 

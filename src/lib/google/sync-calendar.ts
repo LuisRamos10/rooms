@@ -14,10 +14,19 @@ export async function syncCalendarForOrg(orgId: string) {
       if (!event.id) continue;
 
       const meetLink = getMeetLinkFromEvent(event);
-      const status = getEventStatus(event) as RoomStatus;
+      const calendarStatus = getEventStatus(event) as RoomStatus;
       const startTime = new Date(event.start?.dateTime ?? event.start?.date ?? new Date());
       const endTime = new Date(event.end?.dateTime ?? event.end?.date ?? new Date());
       const title = event.summary ?? "Untitled Meeting";
+
+      const existingRoom = await prisma.room.findUnique({
+        where: { orgId_calendarEventId: { orgId, calendarEventId: event.id } },
+        select: { status: true },
+      });
+
+      const status = existingRoom?.status === "ACTIVE" && calendarStatus === "ENDED"
+        ? "ACTIVE" as RoomStatus
+        : calendarStatus;
 
       await prisma.room.upsert({
         where: {
@@ -41,7 +50,7 @@ export async function syncCalendarForOrg(orgId: string) {
           meetLink,
           startTime,
           endTime,
-          status,
+          status: calendarStatus,
           syncedAt: new Date(),
         },
       });
@@ -86,13 +95,41 @@ export async function syncCalendarForOrg(orgId: string) {
     const calendarEventIds = events.map((e) => e.id).filter(Boolean) as string[];
 
     if (calendarEventIds.length > 0) {
-      await prisma.room.updateMany({
+      const staleRooms = await prisma.room.findMany({
         where: {
           orgId,
           calendarEventId: { notIn: calendarEventIds },
+          conferenceRecordId: null,
           startTime: { gte: startOfDay },
           status: { not: "ENDED" },
         },
+        select: { id: true },
+      });
+
+      if (staleRooms.length > 0) {
+        const staleIds = staleRooms.map((r) => r.id);
+        await prisma.room.updateMany({
+          where: { id: { in: staleIds } },
+          data: { status: "ENDED" },
+        });
+      }
+    }
+
+    const pastEndRooms = await prisma.room.findMany({
+      where: {
+        orgId,
+        startTime: { gte: startOfDay },
+        endTime: { lte: now },
+        conferenceRecordId: null,
+        status: { not: "ENDED" },
+      },
+      select: { id: true },
+    });
+
+    if (pastEndRooms.length > 0) {
+      const pastEndIds = pastEndRooms.map((r) => r.id);
+      await prisma.room.updateMany({
+        where: { id: { in: pastEndIds } },
         data: { status: "ENDED" },
       });
     }

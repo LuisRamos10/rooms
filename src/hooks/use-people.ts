@@ -21,7 +21,7 @@ export interface Person {
 
 export function usePeople() {
   return useSWR<Person[]>("/api/people", fetcher, {
-    refreshInterval: 30000,
+    refreshInterval: 15000,
     revalidateOnFocus: true,
   });
 }
